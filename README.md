@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Resume Analyzer
+
+AI-powered resume analysis tool that evaluates your resume against ATS (Applicant Tracking Systems) and provides actionable feedback to improve your chances of landing your dream job.
+
+## Features
+
+- **File Upload**: Drag & drop or click to upload PDF or DOCX resume files
+- **Text Extraction**: Automatic extraction of text from PDF and DOCX files
+- **AI Analysis**: Powered by NVIDIA's AI models for intelligent analysis
+- **ATS Scoring**: Get an ATS compatibility score (0-100)
+- **Tech Stack Detection**: Identify skills and technologies in your resume
+- **Strengths & Weaknesses**: Detailed breakdown of what's working and what needs improvement
+- **Missing Keywords**: Keywords commonly requested but missing from your resume
+- **Suggestions**: Actionable recommendations to improve your resume
+- **Career Advice**: Personalized career guidance
+
+## Tech Stack
+
+- **Framework**: Next.js 16
+- **UI**: React 19 + Tailwind CSS
+- **AI**: OpenAI SDK + NVIDIA API
+- **File Parsing**: pdf-parse (PDF), mammoth (DOCX)
+- **Icons**: Lucide React
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- NVIDIA API Key
+
+### Installation
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file in the project root:
+
+```env
+NVIDIA_API_KEY=your_nvidia_api_key_here
+```
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+```
 
-## Learn More
+### Production
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+├── app/
+│   ├── api/analyze/route.ts    # POST /api/analyze endpoint
+│   ├── page.tsx              # Main landing page
+│   ├── layout.tsx            # Root layout
+│   └── globals.css          # Global styles
+├── components/
+│   ├── ui/                 # Reusable UI components
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── input.tsx
+│   │   ├── label.tsx
+│   │   ├── badge.tsx
+│   │   ├── progress.tsx
+│   │   └── circular-progress.tsx
+│   └── home/
+│       ├── ResumeAnalyzer.tsx    # Main upload component
+│       ├── ATSDashboard.tsx      # Results dashboard
+│       ├── LoadingState.tsx       # Loading animation
+│       └── ErrorState.tsx         # Error handling
+├── lib/
+│   ├── extractors/
+│   │   ├── pdf.ts         # PDF text extraction
+│   │   ├── docx.ts       # DOCX text extraction
+│   │   └── index.ts     # Extractor factory
+│   ├── services/
+│   │   ├── ai-analyzer.ts    # AI resume analysis
+│   │   └── file-analyzer.ts # File handling
+│   └── utils.ts           # Utility functions
+└── types/
+    └── index.ts          # TypeScript types
+```
 
-## Deploy on Vercel
+## API
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### POST /api/analyze
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Analyze a resume file.
+
+**Request**: `multipart/form-data`
+
+- `file`: Resume file (PDF or DOCX, max 10MB)
+
+**Response**: `application/json`
+
+```json
+{
+  "success": true,
+  "data": {
+    "role": "Software Engineer",
+    "level": "Mid-Level",
+    "score": 75,
+    "techStack": ["React", "Node.js", "TypeScript"],
+    "strengths": ["Strong technical skills", "Good project descriptions"],
+    "weaknesses": ["Missing ATS keywords", "No quantified results"],
+    "missingKeywords": ["AWS", "CI/CD", "Docker"],
+    "suggestions": ["Add quantifiable metrics", "Include AWS experience"],
+    "advice": "Focus on adding cloud technologies..."
+  }
+}
+```
+
+## License
+
+MIT
