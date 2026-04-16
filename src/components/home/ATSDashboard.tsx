@@ -92,7 +92,7 @@ export function ATSDashboard({ analysis }: ATSDashboardProps) {
             <ul className="space-y-3">
               {analysis.strengths.map((strength, index) => (
                 <li key={index} className="flex items-start gap-3">
-                  <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
                   <span className="text-sm leading-relaxed text-emerald-900 dark:text-emerald-100">
                     {strength}
                   </span>
@@ -113,7 +113,7 @@ export function ATSDashboard({ analysis }: ATSDashboardProps) {
             <ul className="space-y-3">
               {analysis.weaknesses.map((weakness, index) => (
                 <li key={index} className="flex items-start gap-3">
-                  <div className="mt-1 h-2 w-2 rounded-full bg-red-500 flex-shrink-0" />
+                  <div className="mt-1 h-2 w-2 rounded-full bg-red-500 shrink-0" />
                   <span className="text-sm leading-relaxed text-red-900 dark:text-red-100">
                     {weakness}
                   </span>
@@ -160,7 +160,7 @@ export function ATSDashboard({ analysis }: ATSDashboardProps) {
           <ul className="space-y-3">
             {analysis.suggestions.map((suggestion, index) => (
               <li key={index} className="flex items-start gap-3">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white flex-shrink-0">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white shrink-0">
                   {index + 1}
                 </span>
                 <span className="text-sm leading-relaxed text-blue-900 dark:text-blue-100">
@@ -172,7 +172,7 @@ export function ATSDashboard({ analysis }: ATSDashboardProps) {
         </CardContent>
       </Card>
 
-      <Card className="bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/20 dark:to-indigo-950/20 border-violet-200 dark:border-violet-800">
+      <Card className="bg-linear-to-br from-violet-50 to-indigo-50 dark:from-violet-950/20 dark:to-indigo-950/20 border-violet-200 dark:border-violet-800">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-violet-700 dark:text-violet-400">
             <Lightbulb className="h-5 w-5" />

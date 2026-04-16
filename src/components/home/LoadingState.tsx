@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, FileText, Sparkles, TrendingUp, Target, Clock } from "lucide-react";
+import { FileText, Sparkles, TrendingUp, Target, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function LoadingState() {
+  const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsedTime((prev) => prev + 1);
+      setProgress((prev) => Math.min(prev + 2.5, 95));
     }, 1000);
 
     return () => clearInterval(interval);
@@ -33,43 +35,80 @@ export function LoadingState() {
 
   const currentStep = Math.min(Math.floor(elapsedTime / 3), steps.length - 1);
 
+  const radius = 70;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
   return (
-    <Card className="w-full max-w-3xl">
-      <CardContent className="pt-6">
-        <div className="flex flex-col items-center justify-center space-y-6 py-12">
+    <Card className="w-full max-w-3xl overflow-hidden shadow-2xl border-2 border-zinc-900/20">
+      <CardContent className="pt-8 pb-6">
+        <div className="flex flex-col items-center justify-center space-y-6 py-8">
           <div className="relative">
-            <Loader2 className="h-16 w-16 text-primary animate-spin" />
-            <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary/20 animate-pulse" />
+            <svg className="h-40 w-40 -rotate-90">
+              <circle
+                cx="80"
+                cy="80"
+                r={radius}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="8"
+                className="text-zinc-200 dark:text-zinc-700"
+              />
+              <circle
+                cx="80"
+                cy="80"
+                r={radius}
+                fill="none"
+                stroke="url(#zincGradient)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-1000 ease-linear"
+              />
+              <defs>
+                <linearGradient id="zincGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#27272a" />
+                  <stop offset="100%" stopColor="#18181b" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-4xl font-bold text-zinc-800 dark:text-zinc-100">{Math.round(progress)}%</span>
+              <span className="text-xs text-muted-foreground">Analyzing</span>
+            </div>
           </div>
           
-          <div className="text-center space-y-2">
-            <h3 className="text-lg font-semibold">Analyzing Your Resume</h3>
+          <div className="text-center space-y-1">
+            <h3 className="text-xl font-semibold">
+              Analyzing Your Resume
+            </h3>
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>Time elapsed: {formatTime(elapsedTime)}</span>
+              <Zap className="h-4 w-4" />
+              <span>Time: {formatTime(elapsedTime)}</span>
             </div>
           </div>
 
-          <div className="w-full max-w-md space-y-3">
+          <div className="w-full max-w-md space-y-2">
             {steps.map((step, index) => (
               <div 
                 key={index} 
                 className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
                   index === currentStep 
-                    ? "bg-primary/10 border border-primary/30" 
+                    ? "bg-zinc-100 dark:bg-zinc-800 border border-zinc-800/30" 
                     : index < currentStep 
                       ? "bg-emerald-50 dark:bg-emerald-950/20"
                       : "bg-muted/50"
                 }`}
               >
                 {index < currentStep ? (
-                  <div className="h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                 ) : (
-                  <step.icon className={`h-5 w-5 ${index === currentStep ? "text-primary animate-pulse" : "text-muted-foreground"}`} />
+                  <step.icon className={`h-5 w-5 ${index === currentStep ? "text-zinc-800 animate-pulse" : "text-muted-foreground"}`} />
                 )}
                 <span className={`text-sm ${index <= currentStep ? "font-medium" : "text-muted-foreground"}`}>
                   {step.text}
@@ -78,10 +117,10 @@ export function LoadingState() {
             ))}
           </div>
 
-          <div className="text-xs text-muted-foreground text-center">
-            {elapsedTime < 10 
-              ? "Almost there..." 
-              : "This may take a few more seconds depending on the file size"}
+          <div className="text-xs text-muted-foreground text-center bg-zinc-100 dark:bg-zinc-800 px-4 py-2 rounded-full">
+            {elapsedTime < 15 
+              ? "Please wait while we analyze your resume..." 
+              : "Almost done! Processing your resume..."}
           </div>
         </div>
       </CardContent>

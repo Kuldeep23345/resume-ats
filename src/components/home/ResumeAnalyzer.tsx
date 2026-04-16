@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Upload, FileText, Zap } from "lucide-react";
+import { useCallback, useState, useRef } from "react";
+import { Upload, FileText, Zap, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+
 import { ATSDashboard } from "./ATSDashboard";
 import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
@@ -19,14 +18,22 @@ interface AnalyzeResponse {
   error?: string;
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+}
+
 export function ResumeAnalyzer() {
   const [state, setState] = useState<AnalysisState>("idle");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileChange = useCallback((file: File) => {
     if (file) {
       setSelectedFile(file);
       setAnalysis(null);
@@ -34,11 +41,27 @@ export function ResumeAnalyzer() {
     }
   }, []);
 
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleFileChange(file);
+    },
+    [handleFileChange],
+  );
+
+  const removeFile = useCallback(() => {
+    setSelectedFile(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }, []);
+
   const handleUpload = useCallback(async () => {
     if (!selectedFile) return;
 
     setState("uploading");
     setError(null);
+    setIsUploading(true);
 
     try {
       const formData = new FormData();
@@ -62,6 +85,8 @@ export function ResumeAnalyzer() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setState("error");
+    } finally {
+      setIsUploading(false);
     }
   }, [selectedFile]);
 
@@ -74,6 +99,7 @@ export function ResumeAnalyzer() {
     setSelectedFile(null);
     setAnalysis(null);
     setError(null);
+    if (inputRef.current) inputRef.current.value = "";
   }, []);
 
   if (state === "analyzing" || state === "uploading") {
@@ -92,7 +118,7 @@ export function ResumeAnalyzer() {
           </div>
           <Button onClick={handleReset} variant="outline" className="gap-2">
             <Upload className="h-4 w-4" />
-            Analyze Another Resume
+            Analyze Another
           </Button>
         </div>
         <ATSDashboard analysis={analysis} />
@@ -102,8 +128,8 @@ export function ResumeAnalyzer() {
 
   if (state === "error") {
     return (
-      <ErrorState 
-        error={error || "An unknown error occurred"} 
+      <ErrorState
+        error={error || "An unknown error occurred"}
         onRetry={handleRetry}
         onReset={handleReset}
       />
@@ -111,63 +137,109 @@ export function ResumeAnalyzer() {
   }
 
   return (
-    <Card className="w-full max-w-3xl overflow-hidden shadow-2xl border-2 border-blue-500/20">
-      <div className="h-2 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700" />
+    <Card className="w-full max-w-3xl overflow-hidden shadow-2xl border-2 border-zinc-900/20">
       <CardHeader className="text-center pb-2">
-        <div className="mx-auto h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-          <Upload className="h-8 w-8 text-blue-600" />
+        <div className="mx-auto h-16 w-16 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-4">
+          <Upload className="h-8 w-8 text-zinc-800 dark:text-zinc-100" />
         </div>
-        <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-          Upload Your Resume
-        </CardTitle>
+        <CardTitle className="text-3xl font-bold">Upload Your Resume</CardTitle>
         <p className="text-muted-foreground mt-2">
           Get instant AI-powered analysis and improve your chances
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="relative">
-          <Input
-            id="resume"
-            type="file"
-            accept=".pdf,.doc,.docx"
-            onChange={handleFileChange}
-            className="h-32 cursor-pointer transition-all hover:border-blue-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">Click or drag file here</p>
-          </div>
-        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf,.doc,.docx"
+          className="hidden"
+          onChange={(e) =>
+            e.target.files?.[0] && handleFileChange(e.target.files[0])
+          }
+        />
 
-        {selectedFile && (
-          <div className="p-4 border-2 border-blue-500/30 rounded-xl bg-blue-50 dark:bg-blue-950/20">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-blue-500 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-white" />
+        {!selectedFile ? (
+          <div
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={onDrop}
+            className={`
+              relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
+              transition-all duration-200 ease-in-out
+              ${
+                isDragging
+                  ? "border-zinc-800 bg-zinc-100 dark:bg-zinc-800 scale-[1.02]"
+                  : "border-zinc-300 dark:border-zinc-600 hover:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+              }
+            `}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className={`
+                h-14 w-14 rounded-full flex items-center justify-center
+                transition-all duration-200
+                ${isDragging ? "bg-zinc-800" : "bg-zinc-100 dark:bg-zinc-800"}
+              `}
+              >
+                <Upload
+                  className={`h-7 w-7 ${isDragging ? "text-white" : "text-zinc-800"}`}
+                />
               </div>
-              <div className="flex-1">
-                <p className="font-medium truncate">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+              <div>
+                <p className="font-semibold text-lg">
+                  {isDragging
+                    ? "Drop your file here"
+                    : "Drag & drop your resume"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  or{" "}
+                  <span className="text-zinc-800 font-medium">
+                    click to browse
+                  </span>
                 </p>
               </div>
+              <p className="text-xs text-muted-foreground">
+                PDF, DOC, DOCX up to 10MB
+              </p>
             </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 p-4 border-2 border-zinc-800/30 rounded-xl bg-zinc-50 dark:bg-zinc-800/20">
+            <div className="h-14 w-14 rounded-xl bg-zinc-800 flex items-center justify-center flex-shrink-0">
+              <FileText className="h-7 w-7 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold truncate">{selectedFile.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {formatFileSize(selectedFile.size)}
+              </p>
+            </div>
+            <button
+              onClick={removeFile}
+              className="h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+            >
+              <X className="h-5 w-5 text-zinc-800" />
+            </button>
           </div>
         )}
 
-        <Button 
-          onClick={handleUpload} 
-          className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
-          disabled={!selectedFile}
+        <Button
+          onClick={handleUpload}
+          className="w-full h-12 text-lg font-semibold bg-zinc-900 hover:bg-zinc-800 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+          disabled={!selectedFile || isUploading}
           size="lg"
         >
-          <Zap className="h-5 w-5 mr-2" />
-          Analyze Resume
+          {isUploading ? (
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+          ) : (
+            <Zap className="h-5 w-5 mr-2" />
+          )}
+          {isUploading ? "Analyzing..." : "Analyze Resume"}
         </Button>
-        
-        <p className="text-center text-xs text-muted-foreground">
-          Supports PDF, DOC, DOCX up to 10MB
-        </p>
       </CardContent>
     </Card>
   );

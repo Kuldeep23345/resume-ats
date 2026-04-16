@@ -143,7 +143,7 @@ export function FileUpload() {
 
         {analysis && (
           <div className="space-y-6">
-            <div className="p-6 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+            <div className="p-6 border rounded-lg bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-2xl font-bold">{analysis.role}</h3>
