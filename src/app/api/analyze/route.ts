@@ -1,14 +1,6 @@
-// Polyfill for DOMMatrix (used by pdf-parse in Node.js)
-if (typeof globalThis.DOMMatrix === "undefined") {
-  globalThis.DOMMatrix = class DOMMatrix {
-    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
-    constructor() {}
-  } as any;
-}
+import "@/lib/polyfills/dommatrix";
 
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeFile } from "@/lib/services/file-analyzer";
-import { analyzeResume } from "@/lib/services/ai-analyzer";
 import type { AnalyzeResponse } from "@/types";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -47,6 +39,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    const { analyzeFile } = await import("@/lib/services/file-analyzer");
     const extractedData = await analyzeFile(
       buffer,
       file.name,
@@ -54,6 +48,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       file.size
     );
 
+    const { analyzeResume } = await import("@/lib/services/ai-analyzer");
     const analysis = await analyzeResume(extractedData.text);
 
     return NextResponse.json({

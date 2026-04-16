@@ -1,9 +1,4 @@
 import { PDFParse } from "pdf-parse";
-import path from "path";
-
-PDFParse.setWorker(
-  path.join(process.cwd(), "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs")
-);
 
 export async function extractTextFromPDF(
   buffer: Buffer
