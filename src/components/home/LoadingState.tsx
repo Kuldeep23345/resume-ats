@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { FileText, Sparkles, TrendingUp, Target, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function LoadingState() {
+interface LoadingStateProps {
+  phase?: "extracting" | "analyzing";
+}
+
+export function LoadingState({ phase = "analyzing" }: LoadingStateProps) {
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -33,7 +37,8 @@ export function LoadingState() {
     { icon: Target, text: "Generating insights..." },
   ];
 
-  const currentStep = Math.min(Math.floor(elapsedTime / 3), steps.length - 1);
+  const extractingOffset = phase === "extracting" ? 0 : 1;
+  const currentStep = Math.min(Math.floor(elapsedTime / 3) + extractingOffset, steps.length - 1);
 
   const radius = 70;
   const circumference = 2 * Math.PI * radius;

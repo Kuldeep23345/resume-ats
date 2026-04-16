@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ATSDashboard } from "./ATSDashboard";
 import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
+import { extractTextFromPDF } from "@/lib/extractors/client-pdf";
 import type { ResumeAnalysis } from "@/types";
 
-type AnalysisState = "idle" | "uploading" | "analyzing" | "success" | "error";
+type AnalysisState = "idle" | "extracting" | "uploading" | "analyzing" | "success" | "error";
 
 interface AnalyzeResponse {
   success: boolean;
@@ -64,24 +65,43 @@ export function ResumeAnalyzer() {
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      const isPDF = selectedFile.name.toLowerCase().endsWith(".pdf");
+      let text: string;
 
-      setState("analyzing");
+      if (isPDF) {
+        setState("extracting");
+        text = await extractTextFromPDF(selectedFile);
+        setState("analyzing");
 
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        body: formData,
-      });
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
 
-      const data: AnalyzeResponse = await response.json();
+        const data: AnalyzeResponse = await response.json();
+        if (!data.success || !data.data) {
+          throw new Error(data.error || "Analysis failed");
+        }
+        setAnalysis(data.data);
+        setState("success");
+      } else {
+        setState("analyzing");
+        const formData = new FormData();
+        formData.append("file", selectedFile);
 
-      if (!data.success || !data.data) {
-        throw new Error(data.error || "Analysis failed");
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data: AnalyzeResponse = await response.json();
+        if (!data.success || !data.data) {
+          throw new Error(data.error || "Analysis failed");
+        }
+        setAnalysis(data.data);
+        setState("success");
       }
-
-      setAnalysis(data.data);
-      setState("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setState("error");
@@ -102,8 +122,8 @@ export function ResumeAnalyzer() {
     if (inputRef.current) inputRef.current.value = "";
   }, []);
 
-  if (state === "analyzing" || state === "uploading") {
-    return <LoadingState />;
+  if (state === "analyzing" || state === "uploading" || state === "extracting") {
+    return <LoadingState phase={state === "extracting" ? "extracting" : "analyzing"} />;
   }
 
   if (state === "success" && analysis) {
@@ -151,7 +171,7 @@ export function ResumeAnalyzer() {
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.doc,.docx"
+          accept=".pdf,.docx"
           className="hidden"
           onChange={(e) =>
             e.target.files?.[0] && handleFileChange(e.target.files[0])
@@ -203,7 +223,7 @@ export function ResumeAnalyzer() {
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">
-                PDF, DOC, DOCX up to 10MB
+                PDF, DOCX up to 10MB
               </p>
             </div>
           </div>
