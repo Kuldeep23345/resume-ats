@@ -1,3 +1,11 @@
+// Polyfill for DOMMatrix (used by pdf-parse in Node.js)
+if (typeof globalThis.DOMMatrix === "undefined") {
+  globalThis.DOMMatrix = class DOMMatrix {
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    constructor() {}
+  } as any;
+}
+
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeFile } from "@/lib/services/file-analyzer";
 import { analyzeResume } from "@/lib/services/ai-analyzer";
