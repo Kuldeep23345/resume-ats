@@ -8,23 +8,15 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function jsonError(status: number, message: string): NextResponse<AnalyzeResponse> {
-  return NextResponse.json(
-    { success: false, error: message },
-    {
-      status,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
+function jsonError(message: string, status: number = 400): NextResponse<AnalyzeResponse> {
+  return NextResponse.json({ success: false, error: message }, { status });
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeResponse>> {
   try {
-    const apiKey = process.env.NVIDIA_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      return jsonError(500, "NVIDIA_API_KEY not configured. Please set the NVIDIA_API_KEY environment variable.");
+      return jsonError("GROQ_API_KEY not configured.", 500);
     }
 
     const contentType = request.headers.get("content-type") || "";
@@ -35,34 +27,34 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       const body = await request.json();
       text = body.text;
       if (!text || typeof text !== "string") {
-        return jsonError(400, "No text provided");
+        return jsonError("No text provided", 400);
       }
     } else {
       const formData = await request.formData();
       const file = formData.get("file") as File | null;
       const providedText = formData.get("text") as string | null;
 
-      if (providedText && typeof providedText === "string") {
+      if (providedText) {
         text = providedText;
       } else if (file) {
         if (file.size > MAX_FILE_SIZE) {
-          return jsonError(400, "File size exceeds 10MB limit");
+          return jsonError("File size exceeds 10MB limit", 400);
         }
 
         const fileName = file.name.toLowerCase();
         if (fileName.endsWith(".pdf")) {
-          return jsonError(400, "PDF files must have text extracted client-side. Pass 'text' field instead.");
+          return jsonError("PDF files must have text extracted client-side. Pass 'text' field instead.", 400);
         }
 
         if (fileName.endsWith(".docx")) {
           const buffer = Buffer.from(await file.arrayBuffer());
-          const result = await extractTextFromDOCX(buffer);
-          text = result.text;
+          const { text: extractedText } = await extractTextFromDOCX(buffer);
+          text = extractedText;
         } else {
-          return jsonError(400, "Unsupported file type. Use PDF (text pre-extracted) or DOCX.");
+          return jsonError("Unsupported file type. Use PDF (text pre-extracted) or DOCX.", 400);
         }
       } else {
-        return jsonError(400, "No file or text provided");
+        return jsonError("No file or text provided", 400);
       }
     }
 
@@ -75,6 +67,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
   } catch (error) {
     console.error("Analysis error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    return jsonError(500, errorMessage);
+    return jsonError(errorMessage, 500);
   }
 }

@@ -11,7 +11,13 @@ import { ErrorState } from "./ErrorState";
 import { extractTextFromPDF } from "@/lib/extractors/client-pdf";
 import type { ResumeAnalysis } from "@/types";
 
-type AnalysisState = "idle" | "extracting" | "uploading" | "analyzing" | "success" | "error";
+type AnalysisState =
+  | "idle"
+  | "extracting"
+  | "uploading"
+  | "analyzing"
+  | "success"
+  | "error";
 
 interface AnalyzeResponse {
   success: boolean;
@@ -31,7 +37,6 @@ export function ResumeAnalyzer() {
   const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = useCallback((file: File) => {
@@ -60,53 +65,39 @@ export function ResumeAnalyzer() {
   const handleUpload = useCallback(async () => {
     if (!selectedFile) return;
 
-    setState("uploading");
     setError(null);
-    setIsUploading(true);
-
     try {
       const isPDF = selectedFile.name.toLowerCase().endsWith(".pdf");
-      let text: string;
+      let response: Response;
 
       if (isPDF) {
         setState("extracting");
-        text = await extractTextFromPDF(selectedFile);
+        const text = await extractTextFromPDF(selectedFile);
         setState("analyzing");
-
-        const response = await fetch("/api/analyze", {
+        response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text }),
         });
-
-        const data: AnalyzeResponse = await response.json();
-        if (!data.success || !data.data) {
-          throw new Error(data.error || "Analysis failed");
-        }
-        setAnalysis(data.data);
-        setState("success");
       } else {
         setState("analyzing");
         const formData = new FormData();
         formData.append("file", selectedFile);
-
-        const response = await fetch("/api/analyze", {
+        response = await fetch("/api/analyze", {
           method: "POST",
           body: formData,
         });
-
-        const data: AnalyzeResponse = await response.json();
-        if (!data.success || !data.data) {
-          throw new Error(data.error || "Analysis failed");
-        }
-        setAnalysis(data.data);
-        setState("success");
       }
+
+      const data: AnalyzeResponse = await response.json();
+      if (!data.success || !data.data) {
+        throw new Error(data.error || "Analysis failed");
+      }
+      setAnalysis(data.data);
+      setState("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setState("error");
-    } finally {
-      setIsUploading(false);
     }
   }, [selectedFile]);
 
@@ -122,8 +113,16 @@ export function ResumeAnalyzer() {
     if (inputRef.current) inputRef.current.value = "";
   }, []);
 
-  if (state === "analyzing" || state === "uploading" || state === "extracting") {
-    return <LoadingState phase={state === "extracting" ? "extracting" : "analyzing"} />;
+  if (
+    state === "analyzing" ||
+    state === "uploading" ||
+    state === "extracting"
+  ) {
+    return (
+      <LoadingState
+        phase={state === "extracting" ? "extracting" : "analyzing"}
+      />
+    );
   }
 
   if (state === "success" && analysis) {
@@ -250,15 +249,15 @@ export function ResumeAnalyzer() {
         <Button
           onClick={handleUpload}
           className="w-full h-12 text-lg font-semibold bg-zinc-900 hover:bg-zinc-800 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
-          disabled={!selectedFile || isUploading}
+          disabled={!selectedFile || state !== "idle"}
           size="lg"
         >
-          {isUploading ? (
+          {state !== "idle" ? (
             <Loader2 className="h-5 w-5 mr-2 animate-spin" />
           ) : (
             <Zap className="h-5 w-5 mr-2" />
           )}
-          {isUploading ? "Analyzing..." : "Analyze Resume"}
+          {state !== "idle" ? "Analyzing..." : "Analyze Resume"}
         </Button>
       </CardContent>
     </Card>

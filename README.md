@@ -6,7 +6,7 @@ AI-powered resume analysis tool that evaluates your resume against ATS (Applican
 
 - **File Upload**: Drag & drop or click to upload PDF or DOCX resume files
 - **Text Extraction**: Automatic extraction of text from PDF and DOCX files
-- **AI Analysis**: Powered by NVIDIA's AI models for intelligent analysis
+- **AI Analysis**: Powered by Groq's high-speed AI models
 - **ATS Scoring**: Get an ATS compatibility score (0-100)
 - **Tech Stack Detection**: Identify skills and technologies in your resume
 - **Strengths & Weaknesses**: Detailed breakdown of what's working and what needs improvement
@@ -18,7 +18,7 @@ AI-powered resume analysis tool that evaluates your resume against ATS (Applican
 
 - **Framework**: Next.js 16
 - **UI**: React 19 + Tailwind CSS
-- **AI**: OpenAI SDK + NVIDIA API
+- **AI**: OpenAI SDK + Groq API
 - **File Parsing**: pdf-parse (PDF), mammoth (DOCX)
 - **Icons**: Lucide React
 
@@ -27,7 +27,7 @@ AI-powered resume analysis tool that evaluates your resume against ATS (Applican
 ### Prerequisites
 
 - Node.js 18+
-- NVIDIA API Key
+- Groq API Key
 
 ### Installation
 
@@ -40,7 +40,7 @@ npm install
 Create a `.env.local` file in the project root:
 
 ```env
-NVIDIA_API_KEY=your_nvidia_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
 ### Development

@@ -1,6 +1,14 @@
 "use client";
 
-import { CheckCircle, XCircle, AlertCircle, TrendingUp, Lightbulb, Target, Zap } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  TrendingUp,
+  Lightbulb,
+  Target,
+  Zap,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CircularProgress } from "@/components/ui/circular-progress";
@@ -51,7 +59,9 @@ export function ATSDashboard({ analysis }: ATSDashboardProps) {
               />
               <div className="text-right ml-4">
                 <p className="text-2xl font-bold">{analysis.role}</p>
-                <p className="text-sm text-muted-foreground">{analysis.level}</p>
+                <p className="text-sm text-muted-foreground">
+                  {analysis.level}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -67,8 +77,8 @@ export function ATSDashboard({ analysis }: ATSDashboardProps) {
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {analysis.techStack.map((tech, index) => (
-                <Badge 
-                  key={index} 
+                <Badge
+                  key={index}
                   variant="secondary"
                   className="px-3 py-1 text-sm font-medium"
                 >
@@ -137,8 +147,8 @@ export function ATSDashboard({ analysis }: ATSDashboardProps) {
           </p>
           <div className="flex flex-wrap gap-2">
             {analysis.missingKeywords.map((keyword, index) => (
-              <Badge 
-                key={index} 
+              <Badge
+                key={index}
                 variant="outline"
                 className="px-3 py-1 text-sm font-medium border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-400"
               >

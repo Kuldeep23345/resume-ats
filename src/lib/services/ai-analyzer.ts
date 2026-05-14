@@ -1,151 +1,216 @@
 import OpenAI from "openai";
+import { createHash } from "crypto";
 import type { ResumeAnalysis } from "@/types";
 
-const ANALYSIS_PROMPT = `
-You are a brutally honest ATS (Applicant Tracking System) used by top-tier companies like Google, Meta, and Amazon. Your job is to REJECT weak resumes, not encourage them.
+const SYSTEM_PROMPT = `You are an enterprise-grade ATS scoring engine. You output ONLY valid JSON. No text, no explanation, no markdown — just a single JSON object.
 
-## STRICT SCORING RULES
+SCORING PROTOCOL:
+Start at base score 50. Evaluate the resume against these criteria:
 
-Start every resume at a BASE SCORE of 50. Add or deduct points based ONLY on concrete evidence found in the resume.
+ADDITIONS (only award with clear evidence):
+- Quantified achievements: ≥3 metrics with real numbers (%, $, users, latency) = +20. Two metrics = +12. One = +5. Zero = +0.
+- Tech stack depth: Technologies listed AND demonstrated in projects/jobs = +15. Listed but not demonstrated = +4. Absent = +0.
+- Real projects: Projects with measurable outcomes AND links = +10. Outcomes only = +6. Links only = +3. Neither = +0.
+- Language quality: No filler phrases ("responsible for", "helped with", "worked on", "involved in") = +8. Some filler = +2. Mostly filler = +0.
+- Structure: All sections present (Contact, Experience, Skills, Education, Projects), consistent formatting = +5. Partial = +2. Poor = +0.
+- Credibility: GitHub/portfolio links, verifiable companies, publications = +7. Partial = +3. None = +0.
 
-### Points you can EARN (max additions shown):
-- Quantified achievements with real numbers (e.g., "reduced latency by 40%") → +20
-- Strong, relevant tech stack matching the inferred role → +15
-- Real-world projects with links or clear outcomes → +10
-- Clear structure: proper sections, consistent formatting → +5
+DEDUCTIONS (automatic):
+- Zero quantified achievements = -25
+- ≥3 filler phrases detected = -15
+- Tech stack missing or irrelevant to role = -15
+- Missing critical keywords for role = -12
+- Poor structure = -10
+- Unexplained employment gap >6 months = -8 each (max -16)
+- Keywords stuffed in skills only, not used in context = -5
+- No verifiable links = -5
 
-### Points you WILL LOSE (non-negotiable deductions):
-- Zero quantified achievements (no numbers, no impact metrics) → -25
-- Generic descriptions like "worked on", "helped with", "responsible for" → -15
-- Missing critical keywords for the inferred role → -10
-- Poor or unclear resume structure → -10
-- Unexplained employment gaps > 6 months → -5
+HARD CAPS (applied after calculation, cannot be overridden):
+- No quantified achievements at all → score capped at 52
+- Only 1-2 achievements → capped at 62
+- Filler language dominant → capped at 58
+- No relevant tech stack → capped at 55
+- Missing most role keywords → capped at 60
+- Fresher with no projects and no internships → capped at 45
+- Score ≥80 requires: ≥3 achievements + relevant tech + no filler. Otherwise clamp to 79.
+- Score ≥90 requires: all above + verifiable links + senior-level impact. Otherwise clamp to 89.
 
-### HARD CAPS — these override your score calculation:
-- If the resume has NO measurable achievements → score cannot exceed 55
-- If the resume uses only vague/generic language → score cannot exceed 60
-- If the tech stack is weak or missing for the inferred role → score cannot exceed 65
-- Freshers without projects or internships → score cannot exceed 50
-- Only give 80+ if there is CLEAR evidence of impact, strong stack, AND good structure
-- 90+ is reserved for near-perfect resumes. If you're about to give 90+, reconsider.
+BEHAVIOR:
+- Judge ONLY what is written. Never assume skills not listed.
+- "Developed a feature" = filler. "Built payment gateway handling 10K transactions/day" = evidence.
+- A skills list alone does not prove depth. Look for usage in job descriptions and projects.
+- Be brutally honest in weaknesses and advice. Do not soften language.
 
-## MANDATORY PRE-SCORING CHECKLIST
-
-Before calculating the score, answer these internally:
-1. Does this resume contain at least 3 measurable achievements with real numbers? (yes/no)
-2. Does the tech stack match the inferred role? (yes/no)
-3. Are job descriptions specific or generic? (specific/generic)
-4. Does the resume have real projects or just coursework? (real/coursework only)
-5. Is the structure clean and consistent? (yes/no)
-
-Each "no" or "generic" or "coursework only" answer is a red flag that MUST lower the score.
-
-## OUTPUT FORMAT
-
-Return ONLY valid JSON. No explanation outside the JSON.
-
+OUTPUT FORMAT (strict JSON, no other text):
 {
-  "role": "inferred job role",
+  "role": "specific inferred role",
   "level": "Fresher | Junior | Mid-level | Senior",
-  "score": <number 0–100>,
+  "score": <integer 0-100 after all caps applied>,
   "scoreBreakdown": {
     "baseScore": 50,
-    "earned": <points added>,
-    "deducted": <points removed>,
-    "capsApplied": ["list any hard caps that clamped the score"]
+    "earned": <total points added>,
+    "deducted": <total points removed>,
+    "capsApplied": ["list each cap that was triggered, or empty array"]
   },
-  "techStack": ["skill1", "skill2"],
-  "strengths": ["only real, specific strengths — max 3"],
-  "weaknesses": ["be blunt, not gentle — max 4"],
+  "techStack": ["only technologies evidenced in resume"],
+  "strengths": ["max 3 strengths with cited evidence from the resume"],
+  "weaknesses": ["max 4 weaknesses, be specific and blunt"],
   "missingKeywords": ["keywords expected for this role but absent"],
-  "suggestions": ["actionable fixes, not generic tips — max 4"],
-  "advice": "2–3 sentence brutally honest career advice"
+  "suggestions": ["max 4 actionable improvements specific to THIS resume"],
+  "advice": "2-3 sentences of brutally honest career advice."
 }
-
-## IMPORTANT BEHAVIOR RULES
-- Do NOT give benefit of the doubt. Judge only what is written.
-- Do NOT assume skills not listed.
-- Do NOT soften weaknesses. Be direct.
-- If the resume is weak, say so clearly in advice.
-- Suggestions must be specific to THIS resume, not generic.
-
-Resume:
 `;
 
+// Simple in-memory cache to store analysis results by text hash
+const analysisCache = new Map<string, ResumeAnalysis>();
+
+function getHash(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+let openaiInstance: OpenAI | null = null;
+
 function getClient(): OpenAI {
-  const apiKey = process.env.NVIDIA_API_KEY;
-  
+  if (openaiInstance) return openaiInstance;
+
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("NVIDIA_API_KEY environment variable is not configured");
+    throw new Error("GROQ_API_KEY environment variable is not configured");
   }
 
-  return new OpenAI({
-    apiKey: apiKey,
-    baseURL: "https://integrate.api.nvidia.com/v1",
+  openaiInstance = new OpenAI({
+    apiKey,
+    baseURL: "https://api.groq.com/openai/v1",
     timeout: 180000,
     maxRetries: 3,
   });
+
+  return openaiInstance;
 }
 
-export async function analyzeResume(resumeText: string): Promise<ResumeAnalysis> {
+export async function analyzeResume(
+  resumeText: string,
+): Promise<ResumeAnalysis> {
+  const hash = getHash(resumeText);
+  
+  // Check cache first
+  if (analysisCache.has(hash)) {
+    console.log("Returning cached analysis result");
+    return analysisCache.get(hash)!;
+  }
+
   const client = getClient();
   let responseText = "";
 
   try {
+    // Trim resume to stay within 8K TPM limit
+    // Budget: ~1500 (system) + resume + 4096 (max_tokens) < 8000
+    // So resume must be < ~2400 tokens (~1800 chars)
+    const trimmedResume = resumeText.length > 1800
+      ? resumeText.substring(0, 1800) + "\n[Resume trimmed for processing]"
+      : resumeText;
+
     const completion = await client.chat.completions.create({
-      model: "moonshotai/kimi-k2-instruct",
+      model: "openai/gpt-oss-120b",
       messages: [
         {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        {
           role: "user",
-          content: ANALYSIS_PROMPT + resumeText,
+          content: `Analyze this resume and return ONLY JSON:\n\n${trimmedResume}`,
         },
       ],
-      temperature: 0.3,
-      top_p: 0.95,
-      max_tokens: 2048,
+      temperature: 0.1,
+      top_p: 0.9,
+      max_tokens: 4096,
     });
 
     responseText = completion.choices[0]?.message?.content || "";
+    const finishReason = completion.choices[0]?.finish_reason;
 
     if (!responseText) {
       throw new Error("No response received from AI model");
     }
 
-    let cleanedResponse = responseText
-      .replace(/```json\s*/g, "")
-      .replace(/```\s*/g, "")
+    // Step 1: Strip <think>...</think> blocks (reasoning models emit these)
+    let cleaned = responseText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+    // Step 2: Remove markdown code fences
+    cleaned = cleaned
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/gi, "")
       .trim();
 
-    const jsonStart = cleanedResponse.indexOf("{");
-    const jsonEnd = cleanedResponse.lastIndexOf("}");
+    // Step 3: Find the correct outermost JSON object using bracket matching
+    let jsonString = "";
+    let braceDepth = 0;
+    let jsonStartIdx = -1;
 
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd + 1);
+    for (let i = 0; i < cleaned.length; i++) {
+      if (cleaned[i] === "{") {
+        if (braceDepth === 0) jsonStartIdx = i;
+        braceDepth++;
+      } else if (cleaned[i] === "}") {
+        braceDepth--;
+        if (braceDepth === 0 && jsonStartIdx !== -1) {
+          const candidate = cleaned.substring(jsonStartIdx, i + 1);
+          if (candidate.length > jsonString.length) {
+            jsonString = candidate;
+          }
+          jsonStartIdx = -1;
+        }
+      }
     }
 
-    const analysis = JSON.parse(cleanedResponse) as ResumeAnalysis;
-
-    if (
-      !analysis.role ||
-      !analysis.level ||
-      typeof analysis.score !== "number" ||
-      !Array.isArray(analysis.techStack) ||
-      !Array.isArray(analysis.strengths) ||
-      !Array.isArray(analysis.weaknesses) ||
-      !Array.isArray(analysis.missingKeywords) ||
-      !Array.isArray(analysis.suggestions) ||
-      !analysis.advice
-    ) {
-      throw new Error("Invalid analysis structure returned from AI model");
+    // If no complete JSON found, try to repair truncated JSON
+    if (!jsonString && jsonStartIdx !== -1 && braceDepth > 0) {
+      // The JSON was started but never closed (model ran out of tokens)
+      let truncated = cleaned.substring(jsonStartIdx);
+      // Close any open braces/brackets
+      while (braceDepth > 0) {
+        truncated += "}";
+        braceDepth--;
+      }
+      jsonString = truncated;
     }
+
+    if (!jsonString) {
+      console.error("No JSON found. Response:", cleaned.substring(0, 500));
+      throw new Error("No valid JSON found in AI response");
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawAnalysis = JSON.parse(jsonString) as any;
+
+    // Map the AI output to the ResumeAnalysis type
+    const analysis: ResumeAnalysis = {
+      role: rawAnalysis.role || "Unknown Role",
+      level: rawAnalysis.level || "Unknown",
+      score: rawAnalysis.scoreBreakdown?.finalScore ?? rawAnalysis.score ?? 50,
+      techStack: Array.isArray(rawAnalysis.techStack) ? rawAnalysis.techStack : [],
+      strengths: Array.isArray(rawAnalysis.strengths) ? rawAnalysis.strengths : [],
+      weaknesses: Array.isArray(rawAnalysis.weaknesses) ? rawAnalysis.weaknesses : [],
+      missingKeywords: Array.isArray(rawAnalysis.missingKeywords)
+        ? rawAnalysis.missingKeywords
+        : Array.isArray(rawAnalysis.keywordAnalysis?.missingKeywords)
+          ? rawAnalysis.keywordAnalysis.missingKeywords
+          : [],
+      suggestions: Array.isArray(rawAnalysis.suggestions) ? rawAnalysis.suggestions : [],
+      advice: rawAnalysis.advice || "No advice provided.",
+    };
 
     analysis.score = Math.min(100, Math.max(0, analysis.score));
+
+    // Save to cache
+    analysisCache.set(hash, analysis);
 
     return analysis;
   } catch (error) {
     if (error instanceof SyntaxError) {
-      console.error("AI Response parsing error:", responseText);
-      throw new Error("Failed to parse AI response as JSON");
+      console.error("JSON parse failed. Raw response:", responseText.substring(0, 800));
+      throw new Error("Failed to parse AI response as JSON. The response may have been truncated.");
     }
     throw error;
   }
